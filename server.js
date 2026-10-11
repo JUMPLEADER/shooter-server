@@ -23,7 +23,7 @@ io.on('connection', (socket) => {
 
   // Создать комнату
   socket.on('create-room', () => {
-    const roomId = Math.random().toString(36).substring(2, 8);
+    const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     rooms.set(roomId, {
       players: [socket.id],
       state: null
