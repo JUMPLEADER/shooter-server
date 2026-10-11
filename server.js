@@ -35,7 +35,8 @@ io.on('connection', (socket) => {
 
   // Подключиться к комнате
   socket.on('join-room', (roomId) => {
-    const room = rooms.get(roomId);
+  roomId = String(roomId).toUpperCase();
+  const room = rooms.get(roomId);
     if (!room) {
       socket.emit('error-msg', 'Комната не найдена');
       return;
