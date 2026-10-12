@@ -11,7 +11,7 @@ const io = new Server(httpServer, {
   }
 });
 
-// Комнаты: roomId -> { players: [socketId1, socketId2], state: {...} }
+// Комнаты: roomId -> { players: [socketId1, socketId2] }
 const rooms = new Map();
 
 app.get('/health', (req, res) => {
@@ -25,8 +25,7 @@ io.on('connection', (socket) => {
   socket.on('create-room', () => {
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     rooms.set(roomId, {
-      players: [socket.id],
-      state: null
+      players: [socket.id]
     });
     socket.join(roomId);
     socket.emit('room-created', { roomId });
@@ -35,8 +34,9 @@ io.on('connection', (socket) => {
 
   // Подключиться к комнате
   socket.on('join-room', (roomId) => {
-  roomId = String(roomId).toUpperCase();
-  const room = rooms.get(roomId);
+    roomId = String(roomId).toUpperCase();
+    const room = rooms.get(roomId);
+
     if (!room) {
       socket.emit('error-msg', 'Комната не найдена');
       return;
@@ -45,11 +45,12 @@ io.on('connection', (socket) => {
       socket.emit('error-msg', 'Комната полна');
       return;
     }
+
     room.players.push(socket.id);
     socket.join(roomId);
     socket.emit('room-joined', { roomId });
 
-    // Сообщаем обоим, что можно начинать
+    // Обоим — старт
     io.to(roomId).emit('game-start', {
       players: room.players
     });
@@ -74,9 +75,18 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('opponent-hit', damage);
   });
 
+  // Смерть игрока
+  socket.on('player-died', () => {
+    rooms.forEach((room, roomId) => {
+      if (room.players.includes(socket.id)) {
+        socket.to(roomId).emit('opponent-died');
+      }
+    });
+  });
+
+  // Отключение
   socket.on('disconnect', () => {
     console.log('Disconnected:', socket.id);
-    // Удаляем из комнат
     rooms.forEach((room, roomId) => {
       const idx = room.players.indexOf(socket.id);
       if (idx !== -1) {
