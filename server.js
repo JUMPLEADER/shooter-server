@@ -15,27 +15,14 @@ const SPAWNS = {
 };
 const KILLS_TO_WIN = 3;
 
-// roomId -> {
-//   players: [{ id, slot, nick, score }],
-//   round: number,
-//   state: 'waiting' | 'playing' | 'ended'
-// }
+// roomId -> { players: [{ id, slot, nick, score }], round, state }
 const rooms = new Map();
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', rooms: rooms.size });
 });
 
-// Утилита — найти комнату по socketId
-function findRoomBySocket(socketId) {
-  for (const [roomId, room] of rooms) {
-    const p = room.players.find(pl => pl.id === socketId);
-    if (p) return { roomId, room, player: p };
-  }
-  return null;
-}
-
-// Утилита — публичный вид комнаты для клиента
+// Публичный вид комнаты для клиента
 function roomPublicView(room) {
   return {
     players: room.players.map(p => ({
@@ -115,7 +102,6 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     socket.emit('room-joined', { roomId });
 
-    // Обоим — старт
     room.state = 'playing';
     io.to(roomId).emit('game-start', roomPublicView(room));
     console.log('Game start:', roomId, room.players.map(p => p.slot + ':' + p.nick));
@@ -136,7 +122,7 @@ io.on('connection', (socket) => {
   });
 
   // ============================================================
-  // УРОН (клиент сам считает попадания, сервер доверяет)
+  // УРОН
   // ============================================================
   socket.on('player-hit', ({ roomId, damage }) => {
     socket.to(roomId).emit('opponent-hit', damage);
@@ -162,18 +148,16 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('match-end', {
         winnerId: killer.id,
         winnerSlot: killer.slot,
-        players: room.players.map(p => ({ id: p.id, slot: p.slot, nick: p.nick, score: p.score }))
+        players: room.players.map(p => ({
+          id: p.id, slot: p.slot, nick: p.nick, score: p.score
+        }))
       });
     } else {
-      // Новый раунд
       room.round += 1;
       io.to(roomId).emit('new-round', {
         round: room.round,
         players: room.players.map(p => ({
-          id: p.id,
-          slot: p.slot,
-          nick: p.nick,
-          score: p.score,
+          id: p.id, slot: p.slot, nick: p.nick, score: p.score,
           spawn: SPAWNS[p.slot]
         }))
       });
